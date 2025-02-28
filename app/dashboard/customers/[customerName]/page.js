@@ -1,59 +1,42 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { use } from 'react';
 
-export default function SmartsheetData() {
+export default function CustomerDetail({ params }) {
+  
+  const unwrappedParams = use(params);
+  const customerName = decodeURIComponent(unwrappedParams.customerName);
   const [sheetData, setSheetData] = useState({ columns: [], rows: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [filteredRows, setFilteredRows] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [uniqueCustomers, setUniqueCustomers] = useState(0);
-  const [uniqueTrucks, setUniqueTrucks] = useState(0);
-  const [statusCounts, setStatusCounts] = useState({});
+  const [showShareModal, setShowShareModal] = useState(false);
+  const router = useRouter();
+ // const customerName = decodeURIComponent(params.customerName);
 
   useEffect(() => {
-    const fetchSmartsheetData = async () => {
+    const fetchCustomerData = async () => {
       try {
         const response = await fetch('/api/smartsheet');
-        
         if (!response.ok) {
           throw new Error('Failed to fetch data');
         }
 
         const data = await response.json();
-        console.log('Fetched data:', data); // For debugging
         setSheetData(data);
-        setFilteredRows(data.rows || []);
 
-        // Count unique customers and trucks
+        // Filter rows for this customer
         const clientNameColumnId = 1568237487449988; // ID for 'Client Name' column
-        const truckNumberColumnId = 7197737021663108; // ID for 'Truck Number' column
-        const truckStatusColumnId = 442337580607364; // ID for 'Truck Status' column
-        const uniqueCustomerSet = new Set();
-        const uniqueTruckSet = new Set();
-        const statusCountsTemp = {};
-
-        data.rows?.forEach(row => {
+        const customerRows = data.rows?.filter(row => {
           const clientCell = row.cells.find(cell => cell.columnId === clientNameColumnId);
-          const truckCell = row.cells.find(cell => cell.columnId === truckNumberColumnId);
-          const statusCell = row.cells.find(cell => cell.columnId === truckStatusColumnId);
-          
           const clientName = clientCell?.displayValue || clientCell?.value;
-          const truckNumber = truckCell?.displayValue || truckCell?.value;
-          const status = statusCell?.displayValue || statusCell?.value;
-          
-          if (clientName) uniqueCustomerSet.add(clientName);
-          if (truckNumber) uniqueTruckSet.add(truckNumber);
-          if (status) {
-            statusCountsTemp[status] = (statusCountsTemp[status] || 0) + 1;
-          }
-        });
-        
-        setUniqueCustomers(uniqueCustomerSet.size);
-        setUniqueTrucks(uniqueTruckSet.size);
-        setStatusCounts(statusCountsTemp);
-        
+          return clientName === customerName;
+        }) || [];
+
+        setFilteredRows(customerRows);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -62,14 +45,19 @@ export default function SmartsheetData() {
       }
     };
 
-    fetchSmartsheetData();
-  }, []);
+    fetchCustomerData();
+  }, [customerName]);
 
   // Search functionality
   useEffect(() => {
     if (!sheetData.rows) return;
     
-    const filtered = sheetData.rows.filter(row => 
+    const customerRows = sheetData.rows.filter(row => {
+      const clientCell = row.cells.find(cell => cell.columnId === 1568237487449988);
+      return (clientCell?.displayValue || clientCell?.value) === customerName;
+    });
+
+    const searchFiltered = customerRows.filter(row => 
       row.cells.some(cell => 
         (cell.displayValue || cell.value || '')
           .toString()
@@ -77,8 +65,8 @@ export default function SmartsheetData() {
           .includes(searchTerm.toLowerCase())
       )
     );
-    setFilteredRows(filtered);
-  }, [searchTerm, sheetData.rows]);
+    setFilteredRows(searchFiltered);
+  }, [searchTerm, sheetData.rows, customerName]);
 
   const handleSort = (columnId) => {
     let direction = 'asc';
@@ -119,6 +107,51 @@ export default function SmartsheetData() {
     return statusColors[status] || 'bg-gray-100 text-gray-600';
   };
 
+  // Generate shareable link
+  const getShareableLink = () => {
+    const token = btoa(customerName); // Simple encoding - in production use a more secure method
+    return `${window.location.origin}/shared/${token}`;
+  };
+
+  // Modal component for sharing
+  const ShareModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 max-w-lg w-full m-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Share Dashboard</h3>
+          <button
+            onClick={() => setShowShareModal(false)}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Share this link with your customer to give them access to their shipment dashboard:
+          </p>
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              readOnly
+              value={getShareableLink()}
+              className="flex-1 px-3 py-2 border rounded-lg bg-gray-50"
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(getShareableLink());
+                alert('Link copied to clipboard!');
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -144,7 +177,6 @@ export default function SmartsheetData() {
     'Tonnage': 160862603896708,
     'Container Number': 3820037301135236,
     'Size': 6071837114820484,
-    'Client Name': 1568237487449988,
     'Truck Number': 7197737021663108,
     'Driver Name': 4945937207977860,
     'Truck Status': 442337580607364,
@@ -159,71 +191,35 @@ export default function SmartsheetData() {
 
   return (
     <div className="space-y-6">
-     
-      {/* Main Stats Cards */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Customers Stats Card */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-full">
-              <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-medium text-gray-900">Total Unique Customers</h3>
-              <p className="text-3xl font-semibold text-blue-600">{uniqueCustomers}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Trucks Stats Card */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-green-100 rounded-full">
-              <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-medium text-gray-900">Total Active Trucks</h3>
-              <p className="text-3xl font-semibold text-green-600">{uniqueTrucks}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Status Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        {Object.entries(statusCounts).map(([status, count]) => {
-          const colorClass = getStatusColor(status);
-          const bgClass = colorClass.split(' ')[0];
-          const textClass = colorClass.split(' ')[1];
-          
-          return (
-            <div key={status} className="bg-white rounded-xl shadow-sm p-4">
-              <div className="flex items-center">
-                <div className={`p-3 ${bgClass} rounded-full`}>
-                  <svg className={`h-5 w-5 ${textClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-sm font-medium text-gray-900">{status}</h3>
-                  <p className={`text-2xl font-semibold ${textClass}`}>{count}</p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold text-gray-800">Transit Fleet Tracking</h2>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => router.back()}
+            className="p-2 hover:bg-gray-100 rounded-full"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </button>
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-800">{customerName}</h2>
+            <p className="text-sm text-gray-500">Showing {filteredRows.length} shipments</p>
+          </div>
+        </div>
         <div className="flex space-x-4">
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            <span>Share Link</span>
+          </button>
           <div className="relative">
             <input
               type="text"
-              placeholder="Search any field..."
+              placeholder="Search shipments..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="px-4 py-2 border rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -238,6 +234,9 @@ export default function SmartsheetData() {
           </button>
         </div>
       </div>
+
+      {showShareModal && <ShareModal />}
+
       <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
@@ -297,17 +296,6 @@ export default function SmartsheetData() {
             ))}
           </tbody>
         </table>
-      </div>
-
-      <div className="flex justify-between items-center">
-        <div className="text-sm text-gray-500">
-          Showing {filteredRows.length} of {sheetData.totalRowCount || 0} entries
-        </div>
-        <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-500">
-            Last updated: {new Date(sheetData.modifiedAt).toLocaleString()}
-          </span>
-        </div>
       </div>
     </div>
   );

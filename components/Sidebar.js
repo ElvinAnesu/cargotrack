@@ -4,17 +4,17 @@ import { usePathname } from 'next/navigation';
 
 const getMenuItems = (isAdmin) => {
   const baseItems = [
-    { icon: '📊', label: 'Dashboard', href: '/dashboard' },
-    { icon: '🚢', label: 'Tracking Reports', href: '/dashboard/shipments' },
+    { icon: '🚢', label: 'Tracking Reports', href: '/dashboard' },
+    { icon: '👥', label: 'Customers', href: '/dashboard/customers' },
   ];
 
-  if (isAdmin) {
-    return [
-      ...baseItems,
-      { icon: '👥', label: 'Customers', href: '/dashboard/customers' },
-      { icon: '⚙️', label: 'Settings', href: '/dashboard/settings' },
-    ];
-  }
+  // if (isAdmin) {
+  //   return [
+  //     ...baseItems,
+
+  //     { icon: '⚙️', label: 'Settings', href: '/dashboard/settings' },
+  //   ];
+  // }
 
   return [
     ...baseItems,
