@@ -4,17 +4,11 @@ import { usePathname } from 'next/navigation';
 
 const getMenuItems = (isAdmin) => {
   const baseItems = [
-    { icon: '🚢', label: 'Tracking Reports', href: '/dashboard' },
-    { icon: '👥', label: 'Customers', href: '/dashboard/customers' },
+    { icon: '🚢', label: 'Tracking', href: '/tracking' },
+    { icon: '👥', label: 'Customers', href: '/tracking/customers' },
   ];
 
-  // if (isAdmin) {
-  //   return [
-  //     ...baseItems,
-
-  //     { icon: '⚙️', label: 'Settings', href: '/dashboard/settings' },
-  //   ];
-  // }
+  
 
   return [
     ...baseItems,

@@ -129,7 +129,7 @@ export default function Customers() {
               <tr 
                 key={index} 
                 className="hover:bg-gray-50 cursor-pointer transition duration-150"
-                onClick={() => router.push(`/dashboard/customers/${encodeURIComponent(customer.customerName)}`)}
+                onClick={() => router.push(`/tracking/customers/${encodeURIComponent(customer.customerName)}`)}
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center">
